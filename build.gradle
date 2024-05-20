@@ -1,0 +1,112 @@
+plugins {
+  id 'java'
+  id 'application'
+  id 'org.javamodularity.moduleplugin' version '1.8.12'
+  id 'org.openjfx.javafxplugin' version '0.0.13'
+  id 'org.beryx.jlink' version '2.25.0'
+}
+
+version '1.0-SNAPSHOT'
+
+repositories {
+  mavenCentral()
+}
+
+ext {
+  junitVersion = '5.9.1'
+}
+
+sourceCompatibility = '17'
+targetCompatibility = '17'
+
+tasks.withType(JavaCompile) {
+  options.encoding = 'UTF-8'
+}
+
+application {
+  mainModule = 'com.example.pipeline'
+  mainClass = 'menu.Main_Menu'
+}
+
+javafx {
+  version = '17.0.2'
+  modules = ['javafx.controls', 'javafx.fxml', 'javafx.web', 'javafx.media']
+}
+
+dependencies {
+  //testImplementation('junit:junit:4.13')
+  testImplementation 'io.cucumber:cucumber-java:7.17.0'
+  testImplementation 'io.cucumber:cucumber-junit:7.17.0'
+  implementation('org.controlsfx:controlsfx:11.1.2')
+  implementation('com.dlsc.formsfx:formsfx-core:11.5.0') {
+    exclude(group: 'org.openjfx')
+  }
+  implementation('net.synedra:validatorfx:0.4.0') {
+    exclude(group: 'org.openjfx')
+  }
+  implementation('org.kordamp.ikonli:ikonli-javafx:12.3.1')
+  implementation('org.kordamp.bootstrapfx:bootstrapfx-core:0.4.0')
+  /*implementation('eu.hansolo:tilesfx:17.1.15') {
+    exclude(group: 'org.openjfx')
+  }*/
+  implementation('com.github.almasb:fxgl:17.2') {
+    exclude(group: 'org.openjfx')
+  }
+
+  testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
+  testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
+}
+
+
+jlink {
+  imageZip = project.file("${buildDir}/distributions/app-${javafx.platform.classifier}.zip")
+  options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+  launcher {
+    name = 'app'
+  }
+}
+
+jlinkZip {
+  group = 'distribution'
+}
+
+configurations {
+  cucumberRuntime {
+    extendsFrom testImplementation
+  }
+}
+
+project.ext {
+  cucumberVersion = '5.6.0'
+}
+
+dependencies {
+  testImplementation 'io.cucumber:cucumber-java:' + cucumberVersion
+}
+
+task cucumberTest() {
+  dependsOn assemble, compileTestJava
+  doLast {
+    javaexec {
+      main = "io.cucumber.core.cli.Main"
+      classpath = configurations.cucumberRuntime + sourceSets.main.output + sourceSets.test.output
+      args = ['--plugin', 'html:reports/test-report', '--plugin', 'pretty', '--glue', 'com.example.pipeline', 'src/test/resources']
+    }
+  }
+}
+
+task junitTest(type: Test) {
+  useJUnitPlatform()
+  testLogging {
+    events "passed", "skipped", "failed"
+    exceptionFormat "full"
+    showStandardStreams = true
+  }
+}
+
+tasks.withType(Test) {
+  maxParallelForks = Runtime.runtime.availableProcessors()
+}
+
+test.dependsOn 'cucumberTest', 'junitTest'
+
